@@ -431,7 +431,7 @@ while option_menu:
 				if int(user_input) in filtered_categories:
 					filtered_categories.remove(int(user_input))
 				else:
-					filtered_categories.append(filtered_category )
+					filtered_categories.append(int(user_input) )
 				#Save the new category filter
 				config['filtered_categories'] = filtered_categories
 				with open('config.txt', 'w') as outfile:
