@@ -19,6 +19,8 @@ It will also list items that are not sold in Solitude. Check them and maybe impo
 The script also has filtering options. You can filter by meta level and by category.
 
 ### How to get the tool working
+Requires python 3 and requests http://docs.python-requests.org/en/master/
+
 Since the script imports orders from our citadel you will need to do some extra steps to get the script working.
 
 1) Register as developer at https://developers.eveonline.com
