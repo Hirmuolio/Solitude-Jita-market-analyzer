@@ -150,7 +150,7 @@ def get_item_attributes(type_id):
 		#important dogma attributes
 		#633 = meta level
 		#422 = tech level
-		#1692 = meta group id
+		#1692 = meta group ID
 		
 		type_id_list[type_id] = {}
 		
@@ -236,17 +236,10 @@ except (IOError, json.decoder.JSONDecodeError):
 	client_id = input("Give your client ID: ")
 	client_secret = input("Give your client secret: ")
 	#default filters:
-	filtered_meta = []
-	filtered_techs = []
-	filtered_metagroups = [3, 4, 5, 6]
-	#Meta groups:
-	#3 storyline
-	#4 pirate faction
-	#5 officer
-	#6 deadspace
+	meta_limit = 20
 	filtered_categories = [9, 5, 9, 16, 17, 23, 30, 39, 40, 46, 91, 66]
 	
-	config = {'client_id':client_id, 'client_secret':client_secret, 'filtered_meta':filtered_meta, 'filtered_categories':filtered_categories, 'filtered_metagroups': filtered_metagroups, 'filtered_techs': filtered_techs}
+	config = {'client_id':client_id, 'client_secret':client_secret, 'meta_limit':meta_limit, 'filtered_categories':filtered_categories}
 	with open('config.txt', 'w') as outfile:
 		json.dump(config, outfile, indent=4)
 		
@@ -388,41 +381,20 @@ for key in hub_prices.keys():
 #Sort the lists
 full_sell_sell, full_buy_sell, full_names, full_id = zip(*sorted(zip(full_sell_sell, full_buy_sell, full_names, full_id)))
 
-filtered_meta = config['filtered_meta']
+meta_limit = config['meta_limit']
 filtered_categories = config['filtered_categories']
-filtered_techs = config['filtered_techs']
-filtered_metagroups = config['filtered_metagroups']
-
-metagroup_names = {'3':'storyline', '4':'faction', '5':'officer', '6':'deadspace'}
-
 option_menu=True
-
-print('')
 while option_menu:
-	print('\nMarket data ready for exporting.')
-	print('\nCurrently active filters:')
-	print('Meta levels filtered: ', end="" )
-	for meta in filtered_meta:
-		print( str(meta) + ', ', end="" )
-	print('')
-	
-	print('Tech levels filtered: ', end="")
-	for tech in filtered_techs:
-		print( 'Tech ' + str(tech) + ', ', end="" )
-	print('')
-	
-	print('Meta groups filtered: ', end="" )
-	for id in filtered_metagroups:
-		print( str(metagroup_names[str(id)]) + ', ', end="" )
-	print('')
-		
-	print('Categories filtered: ' , end="")
+	print('\nMarket data ready for exporting')
+	print('currently active filters:')
+	print('Maximum meta level included:', meta_limit)
+	print('filtered categories: ' , end="")
 	for category_id in filtered_categories:
-		print( categories[str(category_id)]+', ', end="")
+		print(categories[str(category_id)]+', ', end="")
 	print('')
 	
-	print('\n[E] Export analyzed market data\n[M] Meta level filter\n[T] Tech level filter\n[G] Meta group filter\n[C] Category filter')
-	user_input = input("[E/M/C/G/T] ")
+	print('\n[E] Export analyzed market data\n[M] Meta level filter\n[C] Category filter')
+	user_input = input("[E/F] ")
 
 	if user_input == 'E' or user_input == 'e':
 		#Just exit this and do the exporting
@@ -433,24 +405,22 @@ while option_menu:
 		#0 = T1
 		#1-4 = meta
 		#5 = T2
-		#6- storyline, faction, ded, officer
-		print('Filtered meta levels:', filtered_meta)
-		user_input = input("Give meta level to include/exlude: ")
+		#5-11 storyline, faction, ded, officer
+		
+		#tech levels:
+		#1
+		#2
+		#3
+		user_input = input("Give max meta level to include: ")
 		try:
-			level = int(user_input)
-			if int(user_input) in filtered_meta:
-				filtered_meta.remove(int(user_input))
-			else:
-				filtered_meta.append(int(user_input))
-				filtered_meta.sort()
+			meta_limit = int(user_input)
 		
 			#Save the new meta limit
-			config['filtered_meta'] = filtered_meta
+			config['meta_limit'] = meta_limit
 			with open('config.txt', 'w') as outfile:
 				json.dump(config, outfile, indent=4)
 		except:
 			print('That is not an integer')
-			
 	elif user_input == 'C' or user_input == 'c':
 		for category_id in categories:
 			if int(category_id) in filtered_categories:
@@ -464,70 +434,13 @@ while option_menu:
 				if int(user_input) in filtered_categories:
 					filtered_categories.remove(int(user_input))
 				else:
-					filtered_categories.append(int(user_input) )
-					filtered_categories.sort()
+					filtered_categories.append(filtered_category )
 				#Save the new category filter
 				config['filtered_categories'] = filtered_categories
 				with open('config.txt', 'w') as outfile:
 					json.dump(config, outfile, indent=4)
 			else:
 				print('no category: '+user_input)
-		except:
-			print('That is not an integer.')
-	elif user_input == 'G' or user_input == 'g':
-		#filter meta groups
-		# 3 = storyline
-		# 4 = faction
-		# 5 = officer
-		# 6 = deadspace
-		
-		print('\nMeta groups:')
-		for id in range(3,6+1):
-			if id in filtered_metagroups:
-				print('[' + str(id)+ '] - ' + metagroup_names[str(id)] + ' - FILTERED')
-			else:
-				print('[' + str(id)+ '] - ' + metagroup_names[str(id)] )
-				
-		user_input = input("\nGive ID of meta group to filter out/remove filtering: ")
-		try:
-			if int(user_input) in [3, 4, 5, 6]:
-				if int(user_input) in filtered_metagroups:
-					filtered_metagroups.remove(int(user_input))
-				else:
-					filtered_metagroups.append(int(user_input) )
-					filtered_metagroups.sort()
-				#Save the new category filter
-				config['filtered_metagroups'] = filtered_metagroups
-				with open('config.txt', 'w') as outfile:
-					json.dump(config, outfile, indent=4)
-			else:
-				print('no category: '+user_input)
-		except:
-			print('That is not an integer.')
-			
-	elif user_input == 'T' or user_input == 't':
-		#Tech level filter
-		print('\nTech levels:')
-		for tech in range(1,3+1):
-			if tech in filtered_techs:
-				print('Tech ' + str(tech)+ ' - FILTERED')
-			else:
-				print('Tech ' + str(tech))
-				
-		user_input = input("\nGive tech level to filter out/remove filtering: ")
-		try:
-			if int(user_input) in [1, 3, 4]:
-				if int(user_input) in filtered_techs:
-					filtered_techs.remove(int(user_input))
-				else:
-					filtered_techs.append(int(user_input) )
-					filtered_techs.sort()
-				#Save the new category filter
-				config['filtered_techs'] = filtered_techs
-				with open('config.txt', 'w') as outfile:
-					json.dump(config, outfile, indent=4)
-			else:
-				print('no tech level: '+user_input)
 		except:
 			print('That is not an integer.')
 		
@@ -547,7 +460,7 @@ for index in range(0, len(full_sell_sell)):
 		out_buy_sell = full_buy_sell[index]
 	
 	#if the item has meta level apply meta level filter
-	if 'meta_level' in type_id_list[str(full_id[index])] and type_id_list[str(full_id[index])]['meta_level'] in filtered_meta:
+	if 'meta_level' in type_id_list[str(full_id[index])] and type_id_list[str(full_id[index])]['meta_level'] > meta_limit:
 		line = ''
 		
 	#if the item has group id apply category filter
