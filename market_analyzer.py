@@ -547,7 +547,7 @@ for index in range(0, len(full_sell_sell)):
 		out_buy_sell = full_buy_sell[index]
 	
 	#if the item has meta level apply meta level filter
-	if 'meta_level' in type_id_list[str(full_id[index])] and type_id_list[str(full_id[index])]['meta_level'] > meta_max:
+	if 'meta_level' in type_id_list[str(full_id[index])] and type_id_list[str(full_id[index])]['meta_level'] in filtered_meta:
 		line = ''
 		
 	#if the item has group id apply category filter
