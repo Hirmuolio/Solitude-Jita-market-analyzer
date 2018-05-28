@@ -511,9 +511,8 @@ for index in range(0, len(full_sell_sell)):
 		if not str(group_id) in group_id_list:
 			#Import group id info and save it
 			print('importing category for group ID: ', group_id)
-			url = 'https://esi.tech.ccp.is/v1/universe/groups/'+str(group_id)+'/'
-			response = requests.get(url)
-			check_error(response, 'get category for group id')
+			
+			response = esi_calling.call_esi(scope = '/v1/universe/groups/{par}', url_parameter=group_id, job = 'get category for groupo id')
 			
 			category_id = response.json()['category_id']
 			
