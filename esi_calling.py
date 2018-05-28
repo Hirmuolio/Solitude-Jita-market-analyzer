@@ -17,7 +17,7 @@ def error_handling(esi_response, number_of_attempts, tokens = None, scope = None
 		input('Press enter to continue trying...')
 		number_of_attempts = 1
 	
-	if job == not '':
+	if job != '':
 		job_description = 'Failed to ' + job
 	
 	print(datetime.utcnow().strftime('%H:%M:%S'), job_description+'. Error',esi_response.status_code, end="")
