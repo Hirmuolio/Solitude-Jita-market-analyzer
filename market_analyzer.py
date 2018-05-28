@@ -1,119 +1,64 @@
 #!/usr/bin/env python3
 
-import requests
 import json
-import webbrowser
-import base64
 import sys
 
-#Code for logging in
-def logging_in():
-	login_url = 'https://login.eveonline.com/oauth/authorize?response_type=code&redirect_uri=http://localhost/oauth-callback&client_id='+client_id+'&scope=esi-markets.structure_markets.v1'
-
-	webbrowser.open(login_url, new=0, autoraise=True)
-
-	authentication_code = input("Give your authentication code: ")
-	
-	combo = base64.b64encode(bytes( client_id+':'+client_secret, 'utf-8')).decode("utf-8")
-	authentication_url = "https://login.eveonline.com/oauth/token"
-	
-	esi_response = requests.post(authentication_url, headers =  {"Authorization":"Basic "+combo}, data = {"grant_type": "authorization_code", "code": authentication_code} )
-	
-	if not check_error(esi_response, 'exchange authorization code for tokens'):
-		response = esi_response.json()
-		
-		access_token = response['access_token']
-		refresh_token = response['refresh_token']
-	else:
-		return
-	
-	return refresh_token
-	
-#Use refresh token to get new access token
-def refresh_auth(refresh_token):
-	refresh_url = 'https://login.eveonline.com/oauth/token'
-	
-	combo = base64.b64encode(bytes( client_id+':'+client_secret, 'utf-8')).decode("utf-8")
-	esi_response = requests.post(refresh_url, headers =  {"Authorization":"Basic "+combo}, data = {"grant_type": "refresh_token", "refresh_token": refresh_token} )
-	
-	if not check_error(esi_response, 'refresh access token'):
-		access_token = esi_response.json()['access_token']
-	else:
-		return 'error'
-
-	return access_token
-	
-	
-def check_error(esi_response, job):
-	status_code = esi_response.status_code
-	
-	if status_code != 200:
-		#Error
-		print(esi_response)
-		print('Failed to '+job+'. Error',esi_response.status_code,'-', esi_response.json()['error'])
-		error = True
-	else:
-		error = False
-		try:
-			#Try to print warning
-			print('Warning',esi_response.headers['warning'])
-		except KeyError:
-			warning = False
-	
-	return error
+import esi_calling
 	
 def import_orders(region_id):
+	#'10000044' Solitude
 	print('importin page 1')
-	market_url = "https://esi.tech.ccp.is/v1/markets/"+region_id+"/orders/"
 	all_orders = []
 	
-	response = requests.get(market_url)
+	response = esi_calling.call_esi(scope = '/v1/markets/{par}/orders/', url_parameter=region_id, job = 'get market orders')
 	
-	if not check_error(response, 'get first page of orders'):
-		all_orders.extend(response.json())
-		total_pages = int(response.headers['X-Pages'])
-		print('total number of pages:'+str(total_pages))
+	all_orders.extend(response.json())
+	total_pages = int(response.headers['X-Pages'])
+	print('total number of pages:'+str(total_pages))
+	
+	responses = []
+	for page in range(2, total_pages + 1):
+		print('\rimportin page: '+str(page)+'/'+str(total_pages), end="")
 		
-		responses = []
-		for page in range(2, total_pages + 1):
-			print('\rimportin page: '+str(page)+'/'+str(total_pages), end="")
-			#print('importin page'+str(page))
-			req = requests.get(market_url, params={'page': page})
-			
-	
-			responses.append(req)
-		for response in responses:
-			data = response.json()
-			all_orders.extend(data)
-		print('. Got {:,d} orders.'.format(len(all_orders)))
-		return all_orders
+		response = esi_calling.call_esi(scope = '/v1/markets/{par}/orders/', url_parameter=region_id, parameters = {'page': page}, job = 'get market orders')
+		
+		responses.append(response)
+	for response in responses:
+		data = response.json()
+		all_orders.extend(data)
+	print('. Got {:,d} orders.'.format(len(all_orders)))
+	return all_orders
 		
 def structure_import_orders(structure_id):
 	print('importin page 1')
 	market_url = "https://esi.tech.ccp.is/v1/markets/structures/"+structure_id+"/"
 	all_orders = []
 	
-	access_token = refresh_auth(refresh_token = config['refresh_token'])
-	response = requests.get(market_url, headers =  {"Authorization":"Bearer "+access_token})
+	tokens = esi_calling.check_tokens(tokens = config['tokens'], client_secret = client_secret, client_id =client_id)
 	
-	if not check_error(response, 'get first page of orders'):
-		all_orders.extend(response.json())
-		total_pages = int(response.headers['X-Pages'])
-		print('total number of pages:'+str(total_pages))
-		
-		responses = []
-		for page in range(2, total_pages + 1):
-			print('\rimportin page: '+str(page)+'/'+str(total_pages), end="")
-			#print('importin page'+str(page))
-			req = requests.get(market_url, params={'page': page})
+	#Save the new tokens
+	config['tokens'] = tokens
+	with open('config.json', 'w') as outfile:
+		json.dump(config, outfile, indent=4)
 			
+	response = esi_calling.call_esi(scope = '/v1/markets/structures/{par}', url_parameter=structure_id, tokens = tokens,  job = 'get citadel orders')
 	
-			responses.append(req)
-		for response in responses:
-			data = response.json()
-			all_orders.extend(data)
-		print('Got {:,d} orders.'.format(len(all_orders)))
-		return all_orders
+	all_orders.extend(response.json())
+	total_pages = int(response.headers['X-Pages'])
+	print('total number of pages:'+str(total_pages))
+	
+	responses = []
+	for page in range(2, total_pages + 1):
+		print('\rimportin page: '+str(page)+'/'+str(total_pages), end="")
+		
+		response = esi_calling.call_esi(scope = '/v1/markets/structures/{par}', url_parameter=structure_id, parameters = {'page': page} , tokens = tokens,  job = 'get citadel orders')
+		
+		responses.append(response)
+	for response in responses:
+		data = response.json()
+		all_orders.extend(data)
+	print('Got {:,d} orders.'.format(len(all_orders)))
+	return all_orders
 		
 def get_item_prices(response):
 	item_prices = {}
@@ -138,45 +83,40 @@ def get_item_prices(response):
 
 def get_item_attributes(type_id):
 	#Note: type_id is string here
-	url = "https://esi.tech.ccp.is/v3/universe/types/"+type_id+"/?datasource=tranquility&language=en-us"
 	
-	esi_response = requests.get(url)
+	esi_response = esi_calling.call_esi(scope = '/v3/universe/types/{par}', url_parameter=type_id, job = 'get item attributes')
 	
-	if not check_error(esi_response, 'get attributes for type ID'):
-		#Important attributes:
-		#'group_id'
-		#'market_group_id'
-		#'name'
-		#important dogma attributes
-		#633 = meta level
-		#422 = tech level
-		#1692 = meta group ID
+	#Important attributes:
+	#'group_id'
+	#'market_group_id'
+	#'name'
+	#important dogma attributes
+	#633 = meta level
+	#422 = tech level
+	#1692 = meta group id
+	
+	type_id_list[type_id] = {}
+	
+	type_id_list[type_id]['name'] = esi_response.json()['name']
+	
+	if 'group_id' in esi_response.json():
+		type_id_list[type_id]['group_id'] = esi_response.json()['group_id']
 		
-		type_id_list[type_id] = {}
+	if 'market_group_id' in esi_response.json():
+		type_id_list[type_id]['market_group_id'] = esi_response.json()['market_group_id']
 		
-		type_id_list[type_id]['name'] = esi_response.json()['name']
+	if 'dogma_attributes' in esi_response.json():
+		for index in range(0, len(esi_response.json()['dogma_attributes'])):
+			if esi_response.json()['dogma_attributes'][index]['attribute_id'] == 633:
+				type_id_list[type_id]['meta_level'] = esi_response.json()['dogma_attributes'][index]['value']
+			elif esi_response.json()['dogma_attributes'][index]['attribute_id'] == 422:
+				type_id_list[type_id]['tech_level'] = esi_response.json()['dogma_attributes'][index]['value']
+			elif esi_response.json()['dogma_attributes'][index]['attribute_id'] == 1692:
+				type_id_list[type_id]['meta_group_id'] = esi_response.json()['dogma_attributes'][index]['value']
 		
-		if 'group_id' in esi_response.json():
-			type_id_list[type_id]['group_id'] = esi_response.json()['group_id']
-
-		
-		if 'market_group_id' in esi_response.json():
-			type_id_list[type_id]['market_group_id'] = esi_response.json()['market_group_id']
-
-		
-		if 'dogma_attributes' in esi_response.json():
-			for index in range(0, len(esi_response.json()['dogma_attributes'])):
-				if esi_response.json()['dogma_attributes'][index]['attribute_id'] == 633:
-					type_id_list[type_id]['meta_level'] = esi_response.json()['dogma_attributes'][index]['value']
-				elif esi_response.json()['dogma_attributes'][index]['attribute_id'] == 422:
-					type_id_list[type_id]['tech_level'] = esi_response.json()['dogma_attributes'][index]['value']
-				elif esi_response.json()['dogma_attributes'][index]['attribute_id'] == 1692:
-					type_id_list[type_id]['meta_group_id'] = esi_response.json()['dogma_attributes'][index]['value']
-
-		
-		#Save the item info list
-		with open('type_id_list.json', 'w') as outfile:
-			json.dump(type_id_list, outfile, indent=4)
+	#Save the item info list
+	with open('type_id_list.json', 'w') as outfile:
+		json.dump(type_id_list, outfile, indent=4)
 			
 
 def import_solitude():
@@ -216,37 +156,56 @@ def import_jita():
 	return jita_prices
 	
 	
+#-----------------------
+#Start working
+#----------------------
+
+
 #Prepare things
 #Check config and log in if needed
 try:
-	config = json.load(open('config.txt'))
+	config = json.load(open('config.json'))
 	
 	try:
 		client_id = config['client_id']
 		client_secret = config['client_secret']
 	except KeyError:
+		#Config found but no wanted content
 		print('no client ID or secret found. \nRegister at https://developers.eveonline.com/applications to get them')
+		
 		client_id = input("Give your client ID: ")
 		client_secret = input("Give your client secret: ")
 		config = {"client_id":client_id, "client_secret":client_secret}
-		with open('config.txt', 'w') as outfile:
+		with open('config.json', 'w') as outfile:
 			json.dump(config, outfile, indent=4)
 except (IOError, json.decoder.JSONDecodeError):
+	#no config
 	print('no client ID or secret found. \nRegister at https://developers.eveonline.com/applications to get them')
 	client_id = input("Give your client ID: ")
 	client_secret = input("Give your client secret: ")
 	#default filters:
-	meta_limit = 20
+	filtered_meta = []
+	filtered_techs = []
+	filtered_metagroups = [3, 4, 5, 6]
+	#Meta groups:
+	#3 storyline
+	#4 pirate faction
+	#5 officer
+	#6 deadspace
 	filtered_categories = [9, 5, 9, 16, 17, 23, 30, 39, 40, 46, 91, 66]
 	
-	config = {'client_id':client_id, 'client_secret':client_secret, 'meta_limit':meta_limit, 'filtered_categories':filtered_categories}
-	with open('config.txt', 'w') as outfile:
+	config = {'client_id':client_id, 'client_secret':client_secret, 'filtered_meta':filtered_meta, 'filtered_categories':filtered_categories, 'filtered_metagroups': filtered_metagroups, 'filtered_techs': filtered_techs}
+	with open('config.json', 'w') as outfile:
 		json.dump(config, outfile, indent=4)
 		
-if not 'refresh_token' in config:
+if not 'tokens' in config:
 	#You need to log in
-	config['refresh_token'] = logging_in()
-	with open('config.txt', 'w') as outfile:
+	
+	tokens = esi_calling.logging_in(scopes = 'esi-markets.structure_markets.v1', client_id = client_id, client_secret = client_secret)
+	
+	config['tokens'] = tokens
+
+	with open('config.json', 'w') as outfile:
 		json.dump(config, outfile, indent=4)
 		
 #Load cached item data
@@ -263,12 +222,8 @@ try:
 except FileNotFoundError:
 	#No file found. Start from scratch
 	print('Importing category list...')
-
-	response = requests.get("https://esi.tech.ccp.is/v1/universe/categories/?datasource=tranquility")
-
-	if check_error(response, 'get list of categories'):
-		user_input = input("Press enter to exit script")
-		sys.exit('')
+	
+	response = esi_calling.call_esi(scope = '/v1/universe/categories/', job = 'get list of categories')
 
 	list_categories = response.json()
 
@@ -278,10 +233,9 @@ except FileNotFoundError:
 	for category_id in list_categories:
 		#print('\rchecking item: '+str(n)+'/'+str(number_of_items)+' type ID '+key, end="")
 		print( '\r'+str(n)+'/'+str(len(list_categories)), end="")
-		response = requests.get('https://esi.tech.ccp.is/v1/universe/categories/'+str(category_id)+'?datasource=tranquility')
-		if check_error(response, 'get list of categories'):
-			user_input = input("Press enter to exit script")
-			sys.exit('')
+		
+		response = esi_calling.call_esi(scope = '/v1/universe/categories/{par}', url_parameter = category_id, job = 'get list of categories')
+		
 		category_name = response.json()['name']
 		categories[str(category_id)] = category_name
 		n= n+1
@@ -322,7 +276,7 @@ while start_menu:
 #Make sure we have the item attributes
 print('getting item attributes')
 number_of_items = len(solitude_prices)
-n=0
+n=1
 for key in solitude_prices.keys():
 	print('\rchecking item: '+str(n+1)+'/'+str(number_of_items)+' type ID '+key, end="")
 	n=n+1
@@ -331,7 +285,7 @@ for key in solitude_prices.keys():
 			
 
 number_of_items = len(hub_prices)
-n=0
+n=1
 for key in hub_prices.keys():
 	print('\rchecking item: '+str(n)+'/'+str(number_of_items)+' type ID '+key, end="")
 	n=n+1
@@ -381,20 +335,41 @@ for key in hub_prices.keys():
 #Sort the lists
 full_sell_sell, full_buy_sell, full_names, full_id = zip(*sorted(zip(full_sell_sell, full_buy_sell, full_names, full_id)))
 
-meta_limit = config['meta_limit']
+filtered_meta = config['filtered_meta']
 filtered_categories = config['filtered_categories']
+filtered_techs = config['filtered_techs']
+filtered_metagroups = config['filtered_metagroups']
+
+metagroup_names = {'3':'storyline', '4':'faction', '5':'officer', '6':'deadspace'}
+
 option_menu=True
+
+print('')
 while option_menu:
-	print('\nMarket data ready for exporting')
-	print('currently active filters:')
-	print('Maximum meta level included:', meta_limit)
-	print('filtered categories: ' , end="")
-	for category_id in filtered_categories:
-		print(categories[str(category_id)]+', ', end="")
+	print('\nMarket data ready for exporting.')
+	print('\nCurrently active filters:')
+	print('Meta levels filtered: ', end="" )
+	for meta in filtered_meta:
+		print( str(meta) + ', ', end="" )
 	print('')
 	
-	print('\n[E] Export analyzed market data\n[M] Meta level filter\n[C] Category filter')
-	user_input = input("[E/F] ")
+	print('Tech levels filtered: ', end="")
+	for tech in filtered_techs:
+		print( 'Tech ' + str(tech) + ', ', end="" )
+	print('')
+	
+	print('Meta groups filtered: ', end="" )
+	for id in filtered_metagroups:
+		print( str(metagroup_names[str(id)]) + ', ', end="" )
+	print('')
+		
+	print('Categories filtered: ' , end="")
+	for category_id in filtered_categories:
+		print( categories[str(category_id)]+', ', end="")
+	print('')
+	
+	print('\n[E] Export analyzed market data\n[M] Meta level filter\n[T] Tech level filter\n[G] Meta group filter\n[C] Category filter')
+	user_input = input("[E/M/C/G/T] ")
 
 	if user_input == 'E' or user_input == 'e':
 		#Just exit this and do the exporting
@@ -405,22 +380,24 @@ while option_menu:
 		#0 = T1
 		#1-4 = meta
 		#5 = T2
-		#5-11 storyline, faction, ded, officer
-		
-		#tech levels:
-		#1
-		#2
-		#3
-		user_input = input("Give max meta level to include: ")
+		#6- storyline, faction, ded, officer
+		print('Filtered meta levels:', filtered_meta)
+		user_input = input("Give meta level to include/exlude: ")
 		try:
-			meta_limit = int(user_input)
+			level = int(user_input)
+			if int(user_input) in filtered_meta:
+				filtered_meta.remove(int(user_input))
+			else:
+				filtered_meta.append(int(user_input))
+				filtered_meta.sort()
 		
 			#Save the new meta limit
-			config['meta_limit'] = meta_limit
-			with open('config.txt', 'w') as outfile:
+			config['filtered_meta'] = filtered_meta
+			with open('config.json', 'w') as outfile:
 				json.dump(config, outfile, indent=4)
 		except:
 			print('That is not an integer')
+			
 	elif user_input == 'C' or user_input == 'c':
 		for category_id in categories:
 			if int(category_id) in filtered_categories:
@@ -434,13 +411,70 @@ while option_menu:
 				if int(user_input) in filtered_categories:
 					filtered_categories.remove(int(user_input))
 				else:
-					filtered_categories.append(filtered_category )
+					filtered_categories.append(int(user_input) )
+					filtered_categories.sort()
 				#Save the new category filter
 				config['filtered_categories'] = filtered_categories
-				with open('config.txt', 'w') as outfile:
+				with open('config.json', 'w') as outfile:
 					json.dump(config, outfile, indent=4)
 			else:
 				print('no category: '+user_input)
+		except:
+			print('That is not an integer.')
+	elif user_input == 'G' or user_input == 'g':
+		#filter meta groups
+		# 3 = storyline
+		# 4 = faction
+		# 5 = officer
+		# 6 = deadspace
+		
+		print('\nMeta groups:')
+		for id in range(3,6+1):
+			if id in filtered_metagroups:
+				print('[' + str(id)+ '] - ' + metagroup_names[str(id)] + ' - FILTERED')
+			else:
+				print('[' + str(id)+ '] - ' + metagroup_names[str(id)] )
+				
+		user_input = input("\nGive ID of meta group to filter out/remove filtering: ")
+		try:
+			if int(user_input) in [3, 4, 5, 6]:
+				if int(user_input) in filtered_metagroups:
+					filtered_metagroups.remove(int(user_input))
+				else:
+					filtered_metagroups.append(int(user_input) )
+					filtered_metagroups.sort()
+				#Save the new category filter
+				config['filtered_metagroups'] = filtered_metagroups
+				with open('config.json', 'w') as outfile:
+					json.dump(config, outfile, indent=4)
+			else:
+				print('no category: '+user_input)
+		except:
+			print('That is not an integer.')
+			
+	elif user_input == 'T' or user_input == 't':
+		#Tech level filter
+		print('\nTech levels:')
+		for tech in range(1,3+1):
+			if tech in filtered_techs:
+				print('Tech ' + str(tech)+ ' - FILTERED')
+			else:
+				print('Tech ' + str(tech))
+				
+		user_input = input("\nGive tech level to filter out/remove filtering: ")
+		try:
+			if int(user_input) in [1, 3, 4]:
+				if int(user_input) in filtered_techs:
+					filtered_techs.remove(int(user_input))
+				else:
+					filtered_techs.append(int(user_input) )
+					filtered_techs.sort()
+				#Save the new category filter
+				config['filtered_techs'] = filtered_techs
+				with open('config.json', 'w') as outfile:
+					json.dump(config, outfile, indent=4)
+			else:
+				print('no tech level: '+user_input)
 		except:
 			print('That is not an integer.')
 		
@@ -460,7 +494,13 @@ for index in range(0, len(full_sell_sell)):
 		out_buy_sell = full_buy_sell[index]
 	
 	#if the item has meta level apply meta level filter
-	if 'meta_level' in type_id_list[str(full_id[index])] and type_id_list[str(full_id[index])]['meta_level'] > meta_limit:
+	if 'meta_level' in type_id_list[str(full_id[index])] and type_id_list[str(full_id[index])]['meta_level'] in filtered_meta:
+		line = ''
+	#if item has tech level apply tech filter
+	elif 'tech_level' in type_id_list[str(full_id[index])] and type_id_list[str(full_id[index])]['tech_level'] in filtered_techs:
+		line = ''
+	#if item has meta group apply meta group filter
+	elif 'meta_group_id' in type_id_list[str(full_id[index])] and type_id_list[str(full_id[index])]['meta_group_id'] in filtered_metagroups:
 		line = ''
 		
 	#if the item has group id apply category filter
