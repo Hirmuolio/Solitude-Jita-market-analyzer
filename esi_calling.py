@@ -12,12 +12,12 @@ from datetime import timedelta
 def error_handling(esi_response, number_of_attempts, tokens = None, scope = None, job = None):
 	#Call this function to decide what to do on error
 	#Some arbitrary maximum try ammount
-	if number_of_attempts is 50:
+	if number_of_attempts == 50:
 		print('There has been 50 failed attemts to call ESI. Something may be wrong.')
 		input('Press enter to continue trying...')
 		number_of_attempts = 1
 	
-	if job is not '':
+	if job == not '':
 		job_description = 'Failed to ' + job
 	
 	print(datetime.utcnow().strftime('%H:%M:%S'), job_description+'. Error',esi_response.status_code, end="")
@@ -29,7 +29,7 @@ def error_handling(esi_response, number_of_attempts, tokens = None, scope = None
 		#No error description from ESI
 		print('')
 		
-	if esi_response.status_code is 420:
+	if esi_response.status_code == 420:
 		#error limit reached. Wait until reset and try again.
 		time.sleep(esi_response.headers['x-esi-error-limit-reset']+1)
 	elif esi_response.status_code in [400, 401, 403]:
@@ -106,7 +106,7 @@ def check_tokens(tokens, client_secret, client_id):
 		combo = base64.b64encode(bytes( client_id+':'+client_secret, 'utf-8')).decode("utf-8")
 		
 		trying = True
-		while trying is True:
+		while trying == True:
 			esi_response = requests.post(refresh_url, headers =  {"Authorization":"Basic "+combo}, data = {"grant_type": "refresh_token", "refresh_token": tokens['refresh_token']} )
 			
 			if esi_response.status_code != 200:
@@ -134,7 +134,7 @@ def get_token_info(tokens):
 	url = 'https://login.eveonline.com/oauth/verify'
 	
 	trying = True
-	while trying is True:
+	while trying == True:
 		esi_response = requests.get(url, headers =  {"Authorization":"Bearer "+tokens['access_token']})
 		
 		if esi_response.status_code != 200:
@@ -177,19 +177,19 @@ def call_esi(scope, url_parameter = '', parameters={}, etag = None, tokens = Non
 	#print(url)
 	
 	#un-authorized / authorized
-	if tokens is None:
+	if tokens == None:
 		headers = {}
 	else:
 		headers =  {"Authorization":"Bearer "+tokens['access_token']}
 	
 	trying = True
-	while trying is True:
+	while trying == True:
 		#Make the call based on calltype
-		if calltype is 'get':
+		if calltype == 'get':
 			esi_response = requests.get(url, headers = headers, params = parameters)
-		elif calltype is 'post':
+		elif calltype == 'post':
 			esi_response = requests.post(url, headers = headers, params = parameters)
-		elif calltype is 'delete':
+		elif calltype == 'delete':
 			esi_response = requests.post(url, headers = headers, params = parameters)
 		
 		#200 = ok
