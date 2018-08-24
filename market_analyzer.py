@@ -4,7 +4,9 @@ import json
 import sys
 
 import esi_calling
-	
+
+esi_calling.set_user_agent('Hirmuolio/Solitude-Jita-market-analyzer')
+
 def import_orders(region_id):
 	#'10000044' Solitude
 	print('importin page 1')
