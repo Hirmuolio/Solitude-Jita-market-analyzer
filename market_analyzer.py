@@ -538,6 +538,6 @@ for index in range(0, len(full_sell_sell)):
 
 print('Exporting to file')	
 with open('export.txt', "w") as text_file:
-	print(output, file=text_file)
+	print(output.encode("utf-8"), file=text_file)
 
 user_input = input("Market analysis exported to export.txt. Press enter to exit.")
